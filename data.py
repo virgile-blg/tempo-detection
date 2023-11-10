@@ -122,13 +122,14 @@ class GTZANDataset(Dataset):
     
 class GTZANDataModule(pl.LightningDataModule):
     def __init__(
-        self, path, beat_type, n_frames,
+        self, path, beat_type, tempo_gt, n_frames,
         batch_size, valid_percent, pin_memory, n_workers
     ):
         super().__init__()
         # Dataset params
         self.path = path
         self.beat_type = beat_type
+        self.tempo_gt = tempo_gt
         self.n_frames = n_frames
 
         # Dataloader params
@@ -143,12 +144,12 @@ class GTZANDataModule(pl.LightningDataModule):
     def setup(self, stage=None):
         
         self.train_set = GTZANDataset(
-            self.tracks[0:self.split], self.beat_type, "train",
+            self.tracks[0:self.split], self.beat_type, self.tempo_gt, "train",
             self.n_frames
         )
         
         self.val_set = GTZANDataset(
-            self.tracks[self.split:], self.beat_type, "validation",
+            self.tracks[self.split:], self.beat_type, self.tempo_gt, "validation",
             self.n_frames
         )
 
