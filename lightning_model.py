@@ -20,7 +20,8 @@ class TempoBeatModel(pl.LightningModule):
         
         self.augment = torch.nn.Identity()
         # self.augment = MelSpecAugment
-        self.neighbour_smooth = NeighbourBalancingKernel()
+        self.tempo_neighbour_smooth = NeighbourBalancingKernel(weights=[0.25, 0.5, 1, 0.5, 0.25])
+        self.beats_neighbour_smooth = NeighbourBalancingKernel(weights=[0.5, 1, 0.5])
         
         self.beat_type = self.hparams['data']['beat_type']
         self.beats_loss = BCESequenceLoss()
