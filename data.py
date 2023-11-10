@@ -36,7 +36,8 @@ class GTZANDataset(Dataset):
         self.mode = mode
         self.n_frames = n_frames
         self.to_logmel = LogMelSpectrogram(**self.LOGMEL_PARAMS)
-        # Issue with one annotation missing, one corrupted audio, and one tempo > 300 bpm
+        
+        # Issues with one annotation missing, one corrupted audio, and one tempo > 300 bpm
         self.tracks = [i for i in audio_list if "reggae.00086" not in i and "jazz.00054" not in i and "jazz.00031" not in i]
     
     def __getitem__(self, index):
@@ -54,10 +55,7 @@ class GTZANDataset(Dataset):
         if os.path.exists(feat_path):
             feat = th.load(feat_path)
         else:
-            try:
-                wav, samplerate = librosa.load(audio_path, sr=44100, mono=True)
-            except Exception as e:
-                print(audio_path)
+            wav, samplerate = librosa.load(audio_path, sr=44100, mono=True)
             assert samplerate == 44100 and len(wav.shape) == 1
             feat = self.to_logmel(th.from_numpy(wav).float())[..., :-1].T
             th.save(feat, feat_path)
@@ -91,7 +89,7 @@ class GTZANDataset(Dataset):
             
             sample["beats"] = beats_sequence.float()
             
-        # Add Tempo to sample
+        # Add tempo to sample
         if "tempo" in self.beat_type:
             if self.tempo_gt == "tempo_annotations":
                 tempo = np.loadtxt(tempo_path)
@@ -105,10 +103,7 @@ class GTZANDataset(Dataset):
                     if mean_beat_frames.isnan():
                         sample["tempo"] = -1
                     else:
-                        sample["tempo"] = round(60 / (mean_beat_frames.item() * self.FRAME_UNIT))
-        
-        
-
+                        sample["tempo"] = round(60 / (mean_beat_frames.item() * self.FRAME_UNIT))    
 
         if self.mode in ["validation"]:
             sample["time_unit"] = self.FRAME_UNIT

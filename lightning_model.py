@@ -13,22 +13,27 @@ from utils import BCESequenceLoss, MelSpecAugment, NeighbourBalancingKernel, Log
 class TempoBeatModel(pl.LightningModule):
     def __init__(self, hparams: om.DictConfig):
         super().__init__()
+        # Load hparams
         self.hparams.update(hparams)
         if not isinstance(hparams, om.DictConfig):
             hparams = om.DictConfig(hparams)
         self.hparams.update(om.OmegaConf.to_container(hparams, resolve=True))
+        self.beat_type = self.hparams['data']['beat_type']
         
+        # Instantiae model
         self.model = BeatBockNet(**self.hparams['model'])
         
+        # Augmentation strategy
         if self.hparams['augment']:
             self.augment = MelSpecAugment()
         else:
             self.augment = torch.nn.Identity()
         
+        # Target smoothing strategy
         self.tempo_neighbour_smooth = NeighbourBalancingKernel(weights=[0.25, 0.5, 1, 0.5, 0.25])
         self.beats_neighbour_smooth = NeighbourBalancingKernel(weights=[0.5, 1, 0.5])
         
-        self.beat_type = self.hparams['data']['beat_type']
+        # Losses
         self.beats_loss = BCESequenceLoss()
         self.tempo_loss = nn.CrossEntropyLoss(ignore_index=-1)
         self.tempo_lambda = 1
@@ -39,7 +44,8 @@ class TempoBeatModel(pl.LightningModule):
         
         self.optimizer = optimizer
 
-        scheduler =  torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=0.1, mode="max", patience=100, min_lr=0.00001)
+        scheduler =  torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, 
+                                                                factor=0.1, mode="max", patience=100, min_lr=0.00001)
         self.scheduler = scheduler
 
         return {"optimizer": optimizer, "scheduler": scheduler, "monitor": "val_loss"}
@@ -58,11 +64,11 @@ class TempoBeatModel(pl.LightningModule):
         tempo = batch["tempo"]
         # To One-hot
         tempo = F.one_hot(torch.round(tempo).long(), num_classes=300).float()
-        # Neighbour smooth
+        # Target smoothing
         tempo = self.tempo_neighbour_smooth(tempo)
         
         beats = batch["beats"]
-        # Neighbour smooth
+        # Target smoothing
         beats = self.beats_neighbour_smooth(beats)
         
         # Forward pass
@@ -83,17 +89,17 @@ class TempoBeatModel(pl.LightningModule):
     def validation_step(self, batch, batch_idx):
 
         val_loss = 0
-
+        # Get audio & annotations from dataloaders
         audio_features = batch["audio_features"]
         
         tempo = batch["tempo"]
         # To One-hot
         tempo = F.one_hot(torch.round(tempo).long(), num_classes=300).float()
-
-        # Add neighbour balancing kernel
+        # Target smoothing
         tempo = self.tempo_neighbour_smooth(tempo)
 
         beats = batch["beats"]
+        # Target smoothing
         beats = self.beats_neighbour_smooth(beats)
 
         # Forward pass
@@ -116,7 +122,7 @@ class TempoBeatModel(pl.LightningModule):
         return torch.mean(val_loss)
 
     @torch.inference_mode()
-    def get_tempo(self, audio, chunk_frames_postprocess=-1):
+    def get_tempo(self, audio, chunk_frames_postprocess=-1, chunk_frame_inference=-1):
         FRAME_UNIT = 0.01
         LOGMEL_PARAMS = {
             "sample_rate": 44100,
@@ -132,6 +138,7 @@ class TempoBeatModel(pl.LightningModule):
         }
         to_logmel = LogMelSpectrogram(**LOGMEL_PARAMS).to(audio.device)
         
+        # Load Mdamom post processor for beats
         beat_postprocessor = madmom.features.beats.DBNBeatTrackingProcessor(
             min_bpm=55.0, max_bpm=215.0, fps=1./FRAME_UNIT, transition_lambda=100, threshold=0.05, correct=True
         )
@@ -163,11 +170,14 @@ class TempoBeatModel(pl.LightningModule):
             beats = torch.cat(beats, dim=1)
             return tempos, beats
 
+        # Get audio features
         feat = to_logmel(audio)[..., :-1].transpose(-1, -2)
 
+        # Chunked inference
         tempos, beats = _chunked_inference(feat)
         tempo = np.mean([i.item() for i in tempos])
 
+        # Beats post-processing
         beats_act = torch.sigmoid(beats).squeeze()
         beats = _chunked_postprocess(beats_act.detach().squeeze().cpu().numpy(), chunk_frames_postprocess)
         

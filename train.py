@@ -1,12 +1,12 @@
 import os
 import yaml
 import argparse
-import pytorch_lightning as pl
 from pathlib import Path
+import pytorch_lightning as pl
 from pytorch_lightning.callbacks import ModelCheckpoint, EarlyStopping
 
-from lightning_model import *
 from data import *
+from lightning_model import *
 
 
 pl.seed_everything()
