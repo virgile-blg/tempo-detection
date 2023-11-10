@@ -1,4 +1,4 @@
-# Hook exercise : music tempo detection
+# Hook exercise : music tempo estimation 🎧
 
 This code base is a reproduction of a tempo classification and beat detection model and its training with the provided GTZAN dataset. 
 
@@ -26,7 +26,7 @@ Short explanation of the different parts of the repo :
 
 ### Test a trained model
 
-Ino order to perform inference, one can use the provided script.
+To perform inference, one can use the provided script.
 
 First, install dependencies :
 
