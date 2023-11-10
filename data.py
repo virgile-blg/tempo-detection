@@ -78,7 +78,7 @@ class GTZANDataset(Dataset):
                     
             beats_sequence = beats_sequence[start:start+frames]
             
-        sample["beats"] = beats_sequence.float()
+            sample["beats"] = beats_sequence.float()
         
         feat = feat[start:start+frames]
         sample["audio_features"] = feat

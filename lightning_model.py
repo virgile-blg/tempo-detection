@@ -33,7 +33,7 @@ class TempoBeatModel(pl.LightningModule):
         scheduler =  torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=0.1, mode="max", patience=100, min_lr=0.00001)
         self.scheduler = scheduler
 
-        return [optimizer], [scheduler]
+        return {"optimizer": optimizer, "scheduler": scheduler, "monitor": "val_loss"}
     
     def forward(self, x):
         return self.model(x)
