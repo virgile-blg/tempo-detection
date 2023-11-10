@@ -57,11 +57,11 @@ class TempoBeatModel(pl.LightningModule):
         # To One-hot
         tempo = F.one_hot(torch.round(tempo).long(), num_classes=300).float()
         # Neighbour smooth
-        tempo = self.neighbour_smooth(tempo)
+        tempo = self.tempo_neighbour_smooth(tempo)
         
         beats = batch["beats"]
         # Neighbour smooth
-        beats = self.neighbour_smooth(beats)
+        beats = self.beats_neighbour_smooth(beats)
         
         # Forward pass
         tempo_hat, beats_hat = self.forward(audio_features)
