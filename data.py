@@ -25,22 +25,18 @@ class GTZANDataset(Dataset):
     }
 
     def __init__(
-            self, path=None, beat_type="beats", mode="train", n_frames=512):
+            self, audio_list=None, beat_type="tempo", mode="train", n_frames=512):
 
         assert beat_type in ["tempo", "beats", "beats+tempo"]
         self.beat_type = beat_type
         self.mode = mode
         self.n_frames = n_frames
         self.to_logmel = LogMelSpectrogram(**self.LOGMEL_PARAMS)
-        
-        # Get audio filelist
-        self.tracks = glob.glob(f'{path}/*/*.wav')
-
+        self.tracks = audio_list
     
     def __getitem__(self, idx):
-
+        print(idx)
         sample = {}
-        
         audio_path = self.tracks[idx]
         print(audio_path)
         tempo_path = f"./gtzan/annotations/tempo/gtzan_{os.path.basename(audio_path).split('.')[0]}_{os.path.basename(audio_path).split('.')[1]}.bpm"
@@ -100,13 +96,12 @@ class GTZANDataset(Dataset):
     
 class GTZANDataModule(pl.LightningDataModule):
     def __init__(
-        self, path, meta_path, beat_type, n_frames,
-        batch_size, pin_memory, n_workers
+        self, path, beat_type, n_frames,
+        batch_size, valid_percent, pin_memory, n_workers
     ):
         super().__init__()
         # Dataset params
         self.path = path
-        self.meta_path = meta_path
         self.beat_type = beat_type
         self.n_frames = n_frames
 
@@ -114,16 +109,22 @@ class GTZANDataModule(pl.LightningDataModule):
         self.batch_size = batch_size
         self.pin_memory = pin_memory
         self.n_workers = n_workers
+        
+        # Get audio filelist
+        self.tracks = glob.glob(f'{self.path}/*/*.wav')
+        self.split = round(valid_percent*len(self.tracks))
 
-    def setup(self):
+    def setup(self, stage=None):
+        
         self.train_set = GTZANDataset(
-            self.path, self.meta_path, "train",
-            self.beat_type, self.n_frames
-        )
+            self.tracks, self.beat_type, "train",
+            self.n_frames
+        )[0:self.split]
+        
         self.val_set = GTZANDataset(
-            self.path, self.meta_path, "validation",
-            self.beat_type, self.n_frames
-        )
+            self.tracks, self.beat_type, "validation",
+            self.n_frames
+        )[self.split:]
 
     def train_dataloader(self):
         return DataLoader(

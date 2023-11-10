@@ -28,7 +28,7 @@ def main(hparams_file):
     # TB Log
     logger = pl.loggers.TensorBoardLogger("tb_logs", name=os.path.splitext(os.path.basename(args.hparams))[0])
     # Callbacks
-    checkpoint_callback = ModelCheckpoint(dirpath=ckpt_folder, **cfg['model_checkpoint'])
+    checkpoint_callback = ModelCheckpoint(**cfg['model_checkpoint'], dirpath=ckpt_folder)
     early_stopping_calllback = EarlyStopping(monitor="val_loss", min_delta=0.0, patience=500)
     # Trainer
     trainer = pl.Trainer(**cfg['trainer'],
