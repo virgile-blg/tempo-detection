@@ -1,6 +1,7 @@
 import torch.nn as nn
 import random as rd
 import torch as th
+import torch.nn.functional as F
 import torchaudio as ta
 import torchaudio.transforms as tat
 import math
@@ -18,7 +19,7 @@ class CrossEntropySequenceLoss(nn.CrossEntropyLoss):
 class BCESequenceLoss(nn.BCEWithLogitsLoss):
     def forward(self, input: th.Tensor, target: th.Tensor):
         # input: batch * seq * C, target: batch * seq
-        input = input.reshape(-1, input.shape[-1])
+        input = input.reshape(-1, input.shape[-1])  
         target = target.reshape(-1, target.shape[-1])
         return super().forward(input, target)
 
@@ -104,3 +105,16 @@ class MelSpecAugment(nn.Module):
 
     def forward(self, input):
         return self.ps(self.fm(input))
+
+
+class NeighbourBalancingKernel(nn.Module):
+    def __init__(self, weights=[0.5, 1, 0.5]):
+        super().__init__()
+        self.window = nn.Parameter(th.tensor([[weights]]), requires_grad=False)
+        self.padding = len(weights) // 2
+
+    def forward(self, x: th.Tensor) -> th.Tensor:
+        x = x.unsqueeze(1)
+        x = F.conv1d(x, self.window, padding=self.padding)
+        x = x.squeeze(1)
+        return x

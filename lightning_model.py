@@ -1,10 +1,11 @@
 import torch
 import torch.nn as nn
 import omegaconf as om
+import torch.nn.functional as F
 import pytorch_lightning as pl
 
 from bock_network import BeatBockNet
-from utils import BCESequenceLoss, MelSpecAugment
+from utils import BCESequenceLoss, MelSpecAugment, NeighbourBalancingKernel
 from metrics import tempo_acc_1
 
 class TempoBeatModel(pl.LightningModule):
@@ -17,10 +18,12 @@ class TempoBeatModel(pl.LightningModule):
         
         self.model = BeatBockNet(**self.hparams['model'])
         
-        self.augment = torch.nn.Identity
+        self.augment = torch.nn.Identity()
         # self.augment = MelSpecAugment
+        self.neighbour_smooth = NeighbourBalancingKernel()
         
-        self.beats_loss = BCESequenceLoss
+        self.beat_type = self.hparams['data']['beat_type']
+        self.beats_loss = BCESequenceLoss()
         self.tempo_loss = nn.CrossEntropyLoss(ignore_index=-1)
         self.tempo_lambda = 1
 
@@ -43,12 +46,18 @@ class TempoBeatModel(pl.LightningModule):
         loss = 0
         # Get audio & annotations from dataloaders
         audio_features = batch["audio_features"]
-        beats = batch["beats"]
-        tempo = batch["tempo"]
-
         # Augmentation if needed
         audio_features = self.augment(audio_features)
-        beats = self.fp(beats)
+        
+        tempo = batch["tempo"]
+        # To One-hot
+        tempo = F.one_hot(torch.round(tempo).long(), num_classes=300).float()
+        # Neighbour smooth
+        tempo = self.neighbour_smooth(tempo)
+        
+        beats = batch["beats"]
+        # Neighbour smooth
+        beats = self.neighbour_smooth(beats)
         
         # Forward pass
         tempo_hat, beats_hat = self.forward(audio_features)
@@ -70,14 +79,19 @@ class TempoBeatModel(pl.LightningModule):
         val_loss = 0
 
         audio_features = batch["audio_features"]
-        beats = batch["beats"]
+        
         tempo = batch["tempo"]
-        # beats_raw = batch["beats_raw"]
-        # time_unit = batch["time_unit"].item()
+        # To One-hot
+        tempo = F.one_hot(torch.round(tempo).long(), num_classes=300).float()
+        # Add neighbour balancing kernel
+        tempo = self.neighbour_smooth(tempo)
+        
+        beats = batch["beats"]
+        beats = self.neighbour_smooth(beats)
 
         # Forward pass
         tempo_hat, beats_hat = self.forward(audio_features)
-        
+
         # Compute losses
         val_loss_tempo = self.tempo_loss(tempo_hat, tempo)
         val_loss_beats = self.beats_loss(beats_hat, beats)

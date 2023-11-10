@@ -128,7 +128,7 @@ class BeatBockNet(nn.Module):
                 Squeeze(-1),
                 GaussianNoise(),
                 nn.Linear(channels, 300),
-                # nn.Softmax(-1)
+                nn.Softmax(-1)
             )
     
         if "beats" in self.mode:

@@ -32,7 +32,8 @@ class GTZANDataset(Dataset):
         self.mode = mode
         self.n_frames = n_frames
         self.to_logmel = LogMelSpectrogram(**self.LOGMEL_PARAMS)
-        self.tracks = audio_list
+        # Issue with one annotation missing
+        self.tracks = [i for i in audio_list if "reggae.00086" not in i]
     
     def __getitem__(self, index):
 
@@ -61,7 +62,10 @@ class GTZANDataset(Dataset):
             
         # Load Tempo
         if "tempo" in self.beat_type:
-            sample["tempo"] = np.loadtxt(tempo_path)
+            tempo = np.loadtxt(tempo_path)
+            
+            sample["tempo"] = tempo
+            
 
         # Load beat sequence
         if "beats" in self.beat_type:

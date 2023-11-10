@@ -5,7 +5,7 @@ xp_config:
 
 data:
   path: "./gtzan/genres_original"
-  beat_type: "tempo"
+  beat_type: "beats+tempo"
   n_frames: 2048
   batch_size: 32
   valid_percent: 0.90
@@ -39,7 +39,7 @@ optim:
   weight_decay: 0
 
 trainer:
-  fast_dev_run: False ####
+  fast_dev_run: False
   devices: [0]
   accelerator: "gpu"
   precision: 32
@@ -48,6 +48,7 @@ trainer:
   num_sanity_val_steps: 1
   check_val_every_n_epoch: 100
   max_epochs: 50000
+  log_every_n_steps: 0
 
 model_checkpoint:
   filename: '{epoch:02d}'
@@ -55,14 +56,3 @@ model_checkpoint:
   every_n_epochs: 5
   save_last: true
   save_top_k: 1
-
-callbacks:
-  lr_monitor:
-    _target_: pytorch_lightning.callbacks.LearningRateMonitor
-    logging_interval: epoch
-
-  early_stopping:
-    _target_: pytorch_lightning.callbacks.EarlyStopping
-    monitor: val_loss/dataloader_idx_0
-    min_delta: 0.0
-    patience: 500
