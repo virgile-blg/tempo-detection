@@ -39,7 +39,7 @@ optim:
   weight_decay: 0
 
 trainer:
-  fast_dev_run: True ####
+  fast_dev_run: False ####
   devices: [0]
   accelerator: "gpu"
   precision: 32
