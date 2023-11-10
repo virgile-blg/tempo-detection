@@ -30,7 +30,7 @@ class TempoBeatModel(pl.LightningModule):
         
         self.optimizer = optimizer
 
-        scheduler =  torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, step_size=1, gamma=0.97)
+        scheduler =  torch.optim.lr_scheduler.ReduceLROnPlateau(self.optimizer, factor=1, mode="max", patience=100, min_lr=0.00001)
         self.scheduler = scheduler
 
         return [optimizer], [scheduler]
