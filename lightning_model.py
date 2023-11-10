@@ -1,12 +1,14 @@
 import torch
+import madmom
+import numpy as np
 import torch.nn as nn
 import omegaconf as om
-import torch.nn.functional as F
 import pytorch_lightning as pl
+import torch.nn.functional as F
 
+from metrics import tempo_acc_1
 from bock_network import BeatBockNet
 from utils import BCESequenceLoss, MelSpecAugment, NeighbourBalancingKernel, LogMelSpectrogram
-from metrics import tempo_acc_1
 
 class TempoBeatModel(pl.LightningModule):
     def __init__(self, hparams: om.DictConfig):
@@ -114,7 +116,7 @@ class TempoBeatModel(pl.LightningModule):
         return torch.mean(val_loss)
 
     @torch.inference_mode()
-    def get_tempo(self, audio, chunk_frames_inference=-1, chunk_frames_postprocess=-1):
+    def get_tempo(self, audio, chunk_frames_postprocess=-1):
         FRAME_UNIT = 0.01
         LOGMEL_PARAMS = {
             "sample_rate": 44100,
@@ -149,29 +151,31 @@ class TempoBeatModel(pl.LightningModule):
 
         def _chunked_inference(feat: torch.Tensor, chunk_frames=3000):
             if chunk_frames < 0:
-                return self.net(feat)
+                return self.forward(feat)
 
-            tempos, beats = []
+            tempos, beats = [], []
 
             for frame in range(0, feat.shape[1], chunk_frames):
                 feat_chunk = feat[:, frame:frame + chunk_frames]
-                tempo_chunk, beats_chunk = self.net(feat_chunk)
+                tempo_chunk, beats_chunk = self.forward(feat_chunk)
                 tempos.append(torch.argmax(tempo_chunk))
                 beats.append(beats_chunk)
-            
             beats = torch.cat(beats, dim=1)
             return tempos, beats
 
-
-
         feat = to_logmel(audio)[..., :-1].transpose(-1, -2)
 
-        feat = self.asp(feat)
         tempos, beats = _chunked_inference(feat)
-        tempo = torch.mean(tempos).detach().numpy()
+        tempo = np.mean([i.item() for i in tempos])
 
         beats_act = torch.sigmoid(beats).squeeze()
         beats = _chunked_postprocess(beats_act.detach().squeeze().cpu().numpy(), chunk_frames_postprocess)
+        
+        # Get tempo from interbeats
+        mean_beat_frames = np.diff(beats.astype(np.float32)).mean()
+        if np.isnan(mean_beat_frames):
+            tempo_ib = -1
+        else:
+            tempo_ib = round(60 / (mean_beat_frames.item()), 2)
 
-
-        return {"beats": beats, "tempo": tempo}
+        return {"beats": beats, "tempo": tempo, "tempo_from_interbeats": tempo_ib}
