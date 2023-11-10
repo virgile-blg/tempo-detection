@@ -34,11 +34,11 @@ class GTZANDataset(Dataset):
         self.to_logmel = LogMelSpectrogram(**self.LOGMEL_PARAMS)
         self.tracks = audio_list
     
-    def __getitem__(self, idx):
-        print(idx)
+    def __getitem__(self, index):
+
         sample = {}
-        audio_path = self.tracks[idx]
-        print(audio_path)
+        audio_path = self.tracks[index]
+        
         tempo_path = f"./gtzan/annotations/tempo/gtzan_{os.path.basename(audio_path).split('.')[0]}_{os.path.basename(audio_path).split('.')[1]}.bpm"
         beat_path = f"./gtzan/annotations/beats/gtzan_{os.path.basename(audio_path).split('.')[0]}_{os.path.basename(audio_path).split('.')[1]}.beats"
 
@@ -117,14 +117,14 @@ class GTZANDataModule(pl.LightningDataModule):
     def setup(self, stage=None):
         
         self.train_set = GTZANDataset(
-            self.tracks, self.beat_type, "train",
+            self.tracks[0:self.split], self.beat_type, "train",
             self.n_frames
-        )[0:self.split]
+        )
         
         self.val_set = GTZANDataset(
-            self.tracks, self.beat_type, "validation",
+            self.tracks[self.split:], self.beat_type, "validation",
             self.n_frames
-        )[self.split:]
+        )
 
     def train_dataloader(self):
         return DataLoader(
