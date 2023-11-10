@@ -25,10 +25,14 @@ class GTZANDataset(Dataset):
     }
 
     def __init__(
-            self, audio_list=None, beat_type="tempo", mode="train", n_frames=512):
+            self, audio_list=None, beat_type="tempo", tempo_gt="tempo_annotations", mode="train", n_frames=512):
 
         assert beat_type in ["tempo", "beats", "beats+tempo"]
+        assert tempo_gt in ["tempo_annotations", "beat_annotations"]
+        if tempo_gt == "beat_annotations" and "beats" not in beat_type:
+            beat_type = "beats+tempo"
         self.beat_type = beat_type
+        self.tempo_gt = tempo_gt
         self.mode = mode
         self.n_frames = n_frames
         self.to_logmel = LogMelSpectrogram(**self.LOGMEL_PARAMS)
@@ -58,19 +62,17 @@ class GTZANDataset(Dataset):
             feat = self.to_logmel(th.from_numpy(wav).float())[..., :-1].T
             th.save(feat, feat_path)
         
+        # get n_frames for training
         if self.mode == "train":
             start, frames = np.random.randint(0, feat.shape[0] - self.n_frames), self.n_frames
         else:
             start, frames = 0, feat.shape[0]
             
-        # Load Tempo
-        if "tempo" in self.beat_type:
-            tempo = np.loadtxt(tempo_path)
+        # Add audio feature to sample
+        feat_n_frames = feat[start:start+frames]
+        sample["audio_features"] = feat_n_frames
             
-            sample["tempo"] = tempo
-            
-
-        # Load beat sequence
+        # Add beat sequence to sample
         if "beats" in self.beat_type:
             if os.path.exists(beat_path_processed):
                 beats_sequence = th.load(beat_path_processed)
@@ -88,9 +90,24 @@ class GTZANDataset(Dataset):
             beats_sequence = beats_sequence[start:start+frames]
             
             sample["beats"] = beats_sequence.float()
+            
+        # Add Tempo to sample
+        if "tempo" in self.beat_type:
+            if self.tempo_gt == "tempo_annotations":
+                tempo = np.loadtxt(tempo_path)
+                sample["tempo"] = tempo
+            else:
+                # Derive tempo from beats annotations
+                if th.nonzero(sample["beats"]).numel() == 0:
+                    sample["tempo"] = -1
+                else:
+                    mean_beat_frames = th.nonzero(sample["beats"]).squeeze(-1).diff().float().mean()
+                    if mean_beat_frames.isnan():
+                        sample["tempo"] = -1
+                    else:
+                        sample["tempo"] = round(60 / (mean_beat_frames.item() * self.FRAME_UNIT))
         
-        feat = feat[start:start+frames]
-        sample["audio_features"] = feat
+        
 
 
         if self.mode in ["validation"]:
