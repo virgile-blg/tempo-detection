@@ -32,8 +32,8 @@ class GTZANDataset(Dataset):
         self.mode = mode
         self.n_frames = n_frames
         self.to_logmel = LogMelSpectrogram(**self.LOGMEL_PARAMS)
-        # Issue with one annotation missing
-        self.tracks = [i for i in audio_list if "reggae.00086" not in i]
+        # Issue with one annotation missing, one corrupted audio, and one tempo > 300 bpm
+        self.tracks = [i for i in audio_list if "reggae.00086" not in i and "jazz.00054" not in i and "jazz.00031" not in i]
     
     def __getitem__(self, index):
 
@@ -50,7 +50,10 @@ class GTZANDataset(Dataset):
         if os.path.exists(feat_path):
             feat = th.load(feat_path)
         else:
-            wav, samplerate = librosa.load(audio_path, sr=44100, mono=True)
+            try:
+                wav, samplerate = librosa.load(audio_path, sr=44100, mono=True)
+            except Exception as e:
+                print(audio_path)
             assert samplerate == 44100 and len(wav.shape) == 1
             feat = self.to_logmel(th.from_numpy(wav).float())[..., :-1].T
             th.save(feat, feat_path)
@@ -72,7 +75,9 @@ class GTZANDataset(Dataset):
             if os.path.exists(beat_path_processed):
                 beats_sequence = th.load(beat_path_processed)
             else:
-                beats = np.loadtxt(beat_path)[:, 0]
+                beats = np.loadtxt(beat_path)
+                if len(beats.shape) > 1:
+                    beats = beats[:, 0]
                 beats_sequence = th.zeros(feat.shape[0], dtype=int)
                 beats_indices = np.array(beats) / self.FRAME_UNIT
                 beats_indices = np.round(beats_indices, 0).astype(int)
