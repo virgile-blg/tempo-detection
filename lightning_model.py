@@ -83,19 +83,21 @@ class TempoBeatModel(pl.LightningModule):
         tempo = batch["tempo"]
         # To One-hot
         tempo = F.one_hot(torch.round(tempo).long(), num_classes=300).float()
+
         # Add neighbour balancing kernel
         tempo = self.neighbour_smooth(tempo)
-        
+
         beats = batch["beats"]
         beats = self.neighbour_smooth(beats)
 
         # Forward pass
         tempo_hat, beats_hat = self.forward(audio_features)
 
+
         # Compute losses
         val_loss_tempo = self.tempo_loss(tempo_hat, tempo)
         val_loss_beats = self.beats_loss(beats_hat, beats)
-        val_loss += self.tempo_lambda * val_loss_tempo + val_loss_beats
+        val_loss += self.tempo_lambda * 0 + val_loss_beats
         
         # Log losses
         self.log('val_tempo', torch.mean(val_loss_tempo), on_step=False, on_epoch=True, logger=True)
@@ -103,18 +105,7 @@ class TempoBeatModel(pl.LightningModule):
         self.log('val_loss', torch.mean(val_loss), on_step=False, on_epoch=True, logger=True)
         
         # Tempo metrics
-        tempo_acc = tempo_acc_1(tempo_hat, tempo)
+        tempo_acc = tempo_acc_1(torch.argmax(tempo_hat), torch.argmax(tempo))
         self.log('tempo_acc_1', tempo_acc, on_step=False, on_epoch=True, logger=True)
-        
-        
-        # TODO beats metrics computation
-        # beats_hat = torch.sigmoid(beats_hat).squeeze()
-        # beats_hat_pp = self.beat_postprocessor(beats_hat.detach().squeeze().cpu().numpy())
-        # beat_indices = (beats_hat_pp / time_unit).astype(int)
-        
-        # beats_hat_nonpp = torch.where(beats_hat > 0.5, 1, 0).nonzero().squeeze().cpu().numpy() * time_unit
-        
-        # beat_metrics_pp = {k + "_pp": v for k, v in beats_score(beats_hat_pp, beats_raw).items()}
-        # beat_metrics_nonpp = {k + "_nonpp": v for k, v in beats_score(beats_hat_nonpp, beats_raw).items()}
         
         return torch.mean(val_loss)
