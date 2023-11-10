@@ -35,7 +35,7 @@ def main(hparams_file):
                         logger=logger,
                         callbacks=[checkpoint_callback, early_stopping_calllback])
     # Train
-    trainer.fit(model=model, datamodule=datamodule, ckpt_path=ckpt_folder)
+    trainer.fit(model=model, datamodule=datamodule)
 
 
 if __name__ == "__main__":
