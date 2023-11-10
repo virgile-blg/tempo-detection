@@ -31,6 +31,8 @@ model:
     - 1024
   dropout: 0.1
 
+augment: False
+
 optim:
   optimizer: "RAdam"
   betas:
