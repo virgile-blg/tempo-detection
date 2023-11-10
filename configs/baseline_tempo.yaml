@@ -6,6 +6,7 @@ xp_config:
 data:
   path: "./gtzan/genres_original"
   beat_type: "beats+tempo"
+  tempo_gt: "tempo_annotations"
   n_frames: 2048
   batch_size: 32
   valid_percent: 0.90
