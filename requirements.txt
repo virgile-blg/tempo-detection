@@ -10,3 +10,4 @@ numpy==1.22
 mirdata==0.3.6
 smart_open
 tensorboard
+madmom==0.16.1
