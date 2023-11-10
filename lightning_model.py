@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import pytorch_lightning as pl
 
 from bock_network import BeatBockNet
-from utils import BCESequenceLoss, MelSpecAugment, NeighbourBalancingKernel
+from utils import BCESequenceLoss, MelSpecAugment, NeighbourBalancingKernel, LogMelSpectrogram
 from metrics import tempo_acc_1
 
 class TempoBeatModel(pl.LightningModule):
@@ -97,7 +97,6 @@ class TempoBeatModel(pl.LightningModule):
         # Forward pass
         tempo_hat, beats_hat = self.forward(audio_features)
 
-
         # Compute losses
         val_loss_tempo = self.tempo_loss(tempo_hat, tempo)
         val_loss_beats = self.beats_loss(beats_hat, beats)
@@ -113,3 +112,66 @@ class TempoBeatModel(pl.LightningModule):
         self.log('tempo_acc_1', tempo_acc, on_step=False, on_epoch=True, logger=True)
         
         return torch.mean(val_loss)
+
+    @torch.inference_mode()
+    def get_tempo(self, audio, chunk_frames_inference=-1, chunk_frames_postprocess=-1):
+        FRAME_UNIT = 0.01
+        LOGMEL_PARAMS = {
+            "sample_rate": 44100,
+            "n_fft": 2048,
+            "hop_length": 441,
+            "n_mels": 128,
+            "f_min": 30,
+            "f_max": 17000,
+            "norm": None,
+            "is_log": True,
+            "eps": 1e-6,
+            "center": True
+        }
+        to_logmel = LogMelSpectrogram(**LOGMEL_PARAMS).to(audio.device)
+        
+        beat_postprocessor = madmom.features.beats.DBNBeatTrackingProcessor(
+            min_bpm=55.0, max_bpm=215.0, fps=1./FRAME_UNIT, transition_lambda=100, threshold=0.05, correct=True
+        )
+
+        def _chunked_postprocess(beats, chunk_frames=3000):
+            if chunk_frames < 0:
+                return beat_postprocessor(beats)
+            
+            beats_postprocessed = []
+            for frame_idx, frame in enumerate(range(0, len(beats), chunk_frames)):
+                beats_chunk = beats[frame:frame + chunk_frames]
+                beats_chunk = beat_postprocessor(beats_chunk)
+                offset = frame_idx * chunk_frames * FRAME_UNIT
+                beats_chunk = beats_chunk + offset
+                beats_postprocessed.extend(beats_chunk)
+            return beats_postprocessed
+
+        def _chunked_inference(feat: torch.Tensor, chunk_frames=3000):
+            if chunk_frames < 0:
+                return self.net(feat)
+
+            tempos, beats = []
+
+            for frame in range(0, feat.shape[1], chunk_frames):
+                feat_chunk = feat[:, frame:frame + chunk_frames]
+                tempo_chunk, beats_chunk = self.net(feat_chunk)
+                tempos.append(torch.argmax(tempo_chunk))
+                beats.append(beats_chunk)
+            
+            beats = torch.cat(beats, dim=1)
+            return tempos, beats
+
+
+
+        feat = to_logmel(audio)[..., :-1].transpose(-1, -2)
+
+        feat = self.asp(feat)
+        tempos, beats = _chunked_inference(feat)
+        tempo = torch.mean(tempos).detach().numpy()
+
+        beats_act = torch.sigmoid(beats).squeeze()
+        beats = _chunked_postprocess(beats_act.detach().squeeze().cpu().numpy(), chunk_frames_postprocess)
+
+
+        return {"beats": beats, "tempo": tempo}
