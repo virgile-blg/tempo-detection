@@ -1,14 +1,12 @@
-# Hook exercise : music tempo estimation 🎧
+# Music tempo estimation 🎧
 
-This code base is a reproduction of a tempo classification and beat detection model and its training with the provided GTZAN dataset. 
+This code base is a reproduction of a tempo classification and beat detection model and its training with the GTZAN dataset. 
 
 This work is based on two papers from Sebatian Böck et al. :
 
 
 - Böck, S., Davies, M. E., & Knees, P. (2019, November). Multi-Task Learning of Tempo and Beat: Learning One to Improve the Other. In ISMIR (pp. 486-493).
 - Böck, S., & Davies, M. E. (2020, October). Deconstruct, Analyse, Reconstruct: How to improve Tempo, Beat, and Downbeat Estimation. In ISMIR (pp. 574-582).
-
-I chose to work with the Pytorch Lightning framework, benefiting from higher level APIs for training while keeping some flexibility on the dataset and training logic side.
 
 ### Organisation of the repository
 
